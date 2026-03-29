@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gaming Pod Kasir — PS4 Rental</title>
+  <meta name="description" content="Sistem kasir gaming pod PS4 rental. Kelola 10 pod real-time dengan fitur booking otomatis." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: { inter: ['Inter', 'sans-serif'] } } } }
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f0f1a; }
+    ::-webkit-scrollbar-thumb { background: #3b3855; border-radius: 3px; }
+    .pod-card { transition: transform 0.18s ease; }
+    .pod-card:hover { transform: translateY(-2px); }
+    #toast { transition: opacity 0.25s ease, transform 0.25s ease; }
+    #toast.hidden-toast { opacity: 0; transform: translateY(16px); pointer-events: none; }
+    #wa-output { font-family: 'Courier New', monospace; resize: none; }
+    .header-glow { background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(139,92,246,0.13) 0%, transparent 70%); }
+  </style>
+</head>
+<body class="bg-[#0f0f1a] text-gray-100 min-h-screen">
+
+  <!-- ═══ HEADER ═══ -->
+  <header class="header-glow border-b border-white/5 px-4 py-4 sticky top-0 z-10 backdrop-blur-md bg-[#0f0f1a]/90">
+    <div class="max-w-2xl mx-auto flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-lg shrink-0">🎮</div>
+        <div>
+          <h1 class="text-lg font-bold text-white leading-tight">Gaming Pod Kasir</h1>
+          <p class="text-xs text-gray-500 font-medium">PS4 Rental Management</p>
+        </div>
+      </div>
+      <div class="text-right">
+        <div id="clock" class="text-xl font-extrabold text-violet-300 tabular-nums tracking-widest"></div>
+        <div id="date-label" class="text-xs text-gray-500 mt-0.5"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══ MAIN ═══ -->
+  <main class="max-w-2xl mx-auto px-3 py-5 space-y-4">
+
+    <!-- LEGEND -->
+    <div class="flex flex-wrap items-center gap-2 text-xs font-bold">
+      <span class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-600/10 text-green-400 border border-green-500/20">
+        <span class="w-1.5 h-1.5 bg-green-500 rounded-full inline-block"></span>Kosong
+      </span>
+      <span class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-600/10 text-red-400 border border-red-500/20">
+        <span class="w-1.5 h-1.5 bg-red-500 rounded-full inline-block"></span>Terisi
+      </span>
+      <span class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-600/10 text-purple-400 border border-purple-500/20">
+        <span class="w-1.5 h-1.5 bg-purple-500 rounded-full inline-block"></span>Booking
+      </span>
+      <span class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-yellow-600/10 text-yellow-300 border border-yellow-500/20">
+        <span class="w-1.5 h-1.5 bg-yellow-400 rounded-full inline-block animate-pulse"></span>Segera Selesai
+      </span>
+      <span class="ml-auto text-gray-500 text-xs">
+        <span id="active-count" class="text-white font-black">0</span> pod aktif
+      </span>
+    </div>
+
+    <!-- COLUMN HEADERS -->
+    <div class="grid grid-cols-2 gap-3">
+      <div class="text-center text-xs font-bold uppercase tracking-widest text-gray-600">Kolom A</div>
+      <div class="text-center text-xs font-bold uppercase tracking-widest text-gray-600">Kolom B</div>
+    </div>
+
+    <!-- POD GRID -->
+    <div id="pod-grid" class="grid grid-cols-2 gap-3"></div>
+
+    <!-- BUTTONS -->
+    <div class="flex flex-wrap gap-2.5 pt-1">
+      <button onclick="generateWA()" class="flex-1 min-w-[140px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm bg-violet-600 hover:bg-violet-500 active:scale-95 transition-all text-white shadow-lg shadow-violet-900/30">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+        Update Format WA
+      </button>
+      <button onclick="confirmResetAll()" class="flex items-center gap-2 px-4 py-3 rounded-xl font-bold text-sm bg-gray-800 hover:bg-gray-700 active:scale-95 transition-all text-gray-300 border border-gray-700">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
+        Reset Semua
+      </button>
+    </div>
+
+    <!-- WA OUTPUT -->
+    <section class="bg-[#141424] border border-white/8 rounded-2xl overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3.5 border-b border-white/5">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-green-400 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
+          </svg>
+          <span class="font-bold text-sm text-white">Format WhatsApp</span>
+        </div>
+        <button onclick="copyToClipboard()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-bold text-xs bg-green-600 hover:bg-green-500 active:scale-95 transition-all text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" /></svg>
+          Copy ke Clipboard
+        </button>
+      </div>
+      <div class="p-4">
+        <textarea id="wa-output" readonly rows="13"
+          class="w-full bg-[#0d0d1a] text-green-300 text-sm rounded-xl p-4 border border-white/5 focus:outline-none leading-loose"
+          placeholder="Tekan 'Update Format WA' untuk generate..."></textarea>
+      </div>
+    </section>
+  </main>
+
+  <!-- ═══ MODAL RESET SEMUA ═══ -->
+  <div id="modal-all" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+    <div class="bg-[#1a1a2e] border border-white/10 rounded-2xl p-6 max-w-xs w-full shadow-2xl">
+      <div class="text-4xl text-center mb-3">⚠️</div>
+      <h3 class="text-base font-bold text-center text-white mb-1.5">Reset Semua Pod?</h3>
+      <p class="text-gray-400 text-xs text-center mb-5">Semua data pod dan booking akan dihapus.</p>
+      <div class="flex gap-2.5">
+        <button onclick="closeModalAll()" class="flex-1 py-2.5 rounded-xl border border-gray-600 text-sm font-semibold text-gray-300 hover:bg-gray-700 transition-colors">Batal</button>
+        <button onclick="resetAllPods()" class="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-sm font-semibold text-white transition-colors">Ya, Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MODAL RESET SINGLE ═══ -->
+  <div id="modal-single" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+    <div class="bg-[#1a1a2e] border border-white/10 rounded-2xl p-6 max-w-xs w-full shadow-2xl">
+      <div class="text-4xl text-center mb-3">🔄</div>
+      <h3 class="text-base font-bold text-center text-white mb-1.5">Reset Pod <span id="modal-pod-id" class="text-violet-400"></span>?</h3>
+      <p class="text-gray-400 text-xs text-center mb-5">Semua data sesi dan booking pod ini akan dihapus.</p>
+      <div class="flex gap-2.5">
+        <button onclick="closeModalSingle()" class="flex-1 py-2.5 rounded-xl border border-gray-600 text-sm font-semibold text-gray-300 hover:bg-gray-700 transition-colors">Batal</button>
+        <button id="modal-single-confirm" class="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-sm font-semibold text-white transition-colors">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TOAST ═══ -->
+  <div id="toast" class="hidden-toast fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl bg-[#1e1e38] border border-violet-500/30 text-sm font-semibold text-white shadow-xl whitespace-nowrap">
+    <span id="toast-icon">✅</span>
+    <span id="toast-text">OK</span>
+  </div>
+
+  <!-- ═══ JAVASCRIPT ═══ -->
+  <script>
+    // ───────────────────────────────────────────────
+    // KONSTANTA
+    // ───────────────────────────────────────────────
+    const POD_IDS    = ['1A','1B','2A','2B','3A','3B','4A','4B','5A','5B'];
+    const STORE_KEY  = 'gaming_pod_v2';
+    const DUR_OPTIONS = [1, 2, 3, 4, 5, 6];
+
+    // ───────────────────────────────────────────────
+    // STATE
+    // ───────────────────────────────────────────────
+    let podData    = {};   // data persisten
+    let uiBooking  = {};   // id -> true jika form booking sedang tampil
+    let selDur     = {};   // 'start-ID' / 'booking-ID' -> angka jam yang dipilih
+
+    // ───────────────────────────────────────────────
+    // UTILITAS WAKTU
+    // ───────────────────────────────────────────────
+
+    /** Padding angka jadi 2 digit */
+    const pad = n => String(n).padStart(2, '0');
+
+    /**
+     * Bulatkan menit ke atas ke kelipatan 5 terdekat.
+     * Jika sudah kelipatan 5 (termasuk 10, 40, dst), tidak berubah.
+     */
+    function roundUpMin(m) {
+      if (m % 5 === 0) return m;
+      return Math.ceil(m / 5) * 5;
+    }
+
+    /** Kembalikan waktu sekarang yang sudah dibulatkan, format "HH:MM" */
+    function nowRounded() {
+      const d = new Date();
+      let h = d.getHours();
+      let m = roundUpMin(d.getMinutes());
+      if (m >= 60) { m -= 60; h = (h + 1) % 24; }
+      return `${pad(h)}:${pad(m)}`;
+    }
+
+    /** Tambahkan N jam ke "HH:MM", hasilnya "HH:MM" */
+    function addHours(hhmm, hours) {
+      const [h, m] = hhmm.split(':').map(Number);
+      const total  = h * 60 + m + hours * 60;
+      return `${pad(Math.floor(total / 60) % 24)}:${pad(total % 60)}`;
+    }
+
+    /** "HH:MM" → total menit */
+    const toMin = hhmm => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+
+    /** Sisa menit dari sekarang ke waktu endHHMM (mempertimbangkan lewat tengah malam) */
+    function remainMin(endHHMM) {
+      const now = new Date();
+      const diff = toMin(endHHMM) - (now.getHours() * 60 + now.getMinutes());
+      return diff < 0 ? diff + 1440 : diff;
+    }
+
+    /** Format sisa waktu jadi "Xj Ym" atau "Ym" */
+    function fmtRemain(min) {
+      if (min <= 0) return 'Selesai';
+      const h = Math.floor(min / 60), m = min % 60;
+      return h > 0 ? `${h}j ${m}m` : `${m}m`;
+    }
+
+    /** "HH:MM" → "HH.MM" untuk display & WA */
+    const toDot = hhmm => hhmm.replace(':', '.');
+
+    // ───────────────────────────────────────────────
+    // STORAGE
+    // ───────────────────────────────────────────────
+    function load() {
+      try { podData = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); }
+      catch { podData = {}; }
+    }
+    const save = () => localStorage.setItem(STORE_KEY, JSON.stringify(podData));
+
+    // ───────────────────────────────────────────────
+    // LOGIKA POD
+    // ───────────────────────────────────────────────
+
+    /** 'empty' | 'active' | 'booked' */
+    function getStatus(id) {
+      const d = podData[id];
+      if (!d || !d.active) return 'empty';
+      return d.booking ? 'booked' : 'active';
+    }
+
+    /** ID pod aktif yang paling cepat selesai (sesi aktif) */
+    function soonestId() {
+      let min = Infinity, result = null;
+      POD_IDS.forEach(id => {
+        const d = podData[id];
+        if (!d || !d.active) return;
+        const rem = remainMin(d.active.endTime);
+        if (rem < min) { min = rem; result = id; }
+      });
+      return result;
+    }
+
+    /** Mulai sesi aktif pod */
+    function startPod(id) {
+      const dur = selDur[`start-${id}`];
+      if (!dur) { toast('⚠️', `Pilih durasi untuk Pod ${id}`, 'warn'); return; }
+      const startTime = nowRounded();
+      const endTime   = addHours(startTime, dur);
+      podData[id] = { active: { startTime, duration: dur, endTime } };
+      save(); render(); generateWA();
+      toast('▶️', `Pod ${id} dimulai — selesai ${toDot(endTime)}`);
+    }
+
+    /** Tambah booking ke pod aktif */
+    function bookPod(id) {
+      const d = podData[id];
+      if (!d || !d.active) return;
+      const dur = selDur[`booking-${id}`];
+      if (!dur) { toast('⚠️', `Pilih durasi booking Pod ${id}`, 'warn'); return; }
+      const startTime = d.active.endTime;
+      const endTime   = addHours(startTime, dur);
+      podData[id].booking = { startTime, duration: dur, endTime };
+      save(); uiBooking[id] = false; render(); generateWA();
+      toast('📅', `Booking Pod ${id} — ${toDot(startTime)}→${toDot(endTime)}`);
+    }
+
+    /** Reset satu pod */
+    function resetPod(id) {
+      delete podData[id];
+      uiBooking[id] = false;
+      selDur[`start-${id}`] = null;
+      selDur[`booking-${id}`] = null;
+      save(); closeModalSingle(); render(); generateWA();
+      toast('🔄', `Pod ${id} direset`);
+    }
+
+    /** Reset semua */
+    function resetAllPods() {
+      podData = {}; uiBooking = {}; selDur = {};
+      save(); closeModalAll(); render();
+      document.getElementById('wa-output').value = '';
+      toast('🔄', 'Semua pod direset');
+    }
+
+    // ───────────────────────────────────────────────
+    // DURASI PICKER (tanpa re-render seluruh grid)
+    // ───────────────────────────────────────────────
+    function pickDur(key, dur) {
+      selDur[key] = dur;
+      const group = document.getElementById(`dg-${key}`);
+      if (!group) return;
+      group.querySelectorAll('button').forEach(btn => {
+        const isSel = parseInt(btn.dataset.v) === dur;
+        btn.className = isSel
+          ? 'dur-btn px-2.5 py-1 rounded-lg text-xs font-bold border bg-violet-600 text-white border-violet-600 transition-all active:scale-95'
+          : 'dur-btn px-2.5 py-1 rounded-lg text-xs font-bold border bg-black/25 text-gray-400 border-white/10 hover:border-white/20 transition-all active:scale-95';
+      });
+    }
+
+    /** Buat HTML duration picker */
+    function durPicker(key, label) {
+      const cur = selDur[key];
+      const btns = DUR_OPTIONS.map(h => {
+        const isSel = cur === h;
+        const cls = isSel
+          ? 'dur-btn px-2.5 py-1 rounded-lg text-xs font-bold border bg-violet-600 text-white border-violet-600 transition-all active:scale-95'
+          : 'dur-btn px-2.5 py-1 rounded-lg text-xs font-bold border bg-black/25 text-gray-400 border-white/10 hover:border-white/20 transition-all active:scale-95';
+        return `<button class="${cls}" data-v="${h}" onclick="pickDur('${key}',${h})">${h}j</button>`;
+      }).join('');
+      return `
+        <div class="mb-2.5">
+          <p class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1.5">${label}</p>
+          <div id="dg-${key}" class="flex flex-wrap gap-1.5">${btns}</div>
+        </div>`;
+    }
+
+    // ───────────────────────────────────────────────
+    // RENDER
+    // ───────────────────────────────────────────────
+    function render() {
+      const grid   = document.getElementById('pod-grid');
+      const soon   = soonestId();
+      let activeCt = 0;
+
+      grid.innerHTML = '';
+
+      POD_IDS.forEach((id, idx) => {
+        const status  = getStatus(id);
+        const isSoon  = status !== 'empty' && id === soon;
+        const d       = podData[id];
+        const showBF  = uiBooking[id] && status === 'active'; // booking form visible?
+        if (status !== 'empty') activeCt++;
+
+        // ── Warna kartu ──
+        let bdr, bg;
+        if      (isSoon)            { bdr = 'border-yellow-400/60'; bg = 'bg-yellow-950/25'; }
+        else if (status === 'booked') { bdr = 'border-purple-500/40'; bg = 'bg-purple-950/20'; }
+        else if (status === 'active') { bdr = 'border-red-500/40';    bg = 'bg-red-950/20'; }
+        else                          { bdr = 'border-green-500/30';  bg = 'bg-green-950/15'; }
+
+        // ── Badge status ──
+        let bCls, bDot, bLabel;
+        if (isSoon) {
+          bCls = 'bg-yellow-600/15 border-yellow-400/30 text-yellow-300';
+          bDot = 'bg-yellow-400 animate-pulse'; bLabel = 'Segera Selesai';
+        } else if (status === 'booked') {
+          bCls = 'bg-purple-600/15 border-purple-500/30 text-purple-300';
+          bDot = 'bg-purple-400'; bLabel = 'Booking';
+        } else if (status === 'active') {
+          bCls = 'bg-red-600/15 border-red-500/30 text-red-400';
+          bDot = 'bg-red-500'; bLabel = 'Terisi';
+        } else {
+          bCls = 'bg-green-600/15 border-green-500/30 text-green-400';
+          bDot = 'bg-green-500'; bLabel = 'Kosong';
+        }
+
+        // ── Bagian waktu (jika ada sesi) ──
+        let timeHTML = '';
+        if (d && d.active) {
+          const rem      = remainMin(d.active.endTime);
+          const remTxt   = fmtRemain(rem);
+          const endColor = isSoon ? 'text-yellow-300' : 'text-red-300';
+          timeHTML += `
+            <div class="bg-black/25 rounded-xl p-2.5 mb-2.5 space-y-1">
+              <div class="flex justify-between text-xs">
+                <span class="text-gray-500 font-semibold">AKTIF</span>
+                <span class="text-gray-400 font-medium">${isSoon ? '⏰' : '⌚'} ${remTxt}</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="text-sm font-black text-white tabular-nums">${toDot(d.active.startTime)}</span>
+                <span class="text-gray-600 text-xs">→</span>
+                <span class="text-sm font-black ${endColor} tabular-nums">${toDot(d.active.endTime)}</span>
+                <span class="ml-auto text-xs text-gray-600">${d.active.duration}j</span>
+              </div>
+            </div>`;
+
+          if (d.booking) {
+            timeHTML += `
+              <div class="bg-purple-950/35 rounded-xl p-2.5 border border-purple-500/25 mb-2.5 space-y-1">
+                <div class="flex justify-between text-xs">
+                  <span class="text-purple-400 font-semibold">BOOKING</span>
+                  <span class="text-purple-400/60">${d.booking.duration}j</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-sm font-black text-gray-300 tabular-nums">${toDot(d.booking.startTime)}</span>
+                  <span class="text-gray-600 text-xs">→</span>
+                  <span class="text-sm font-black text-purple-300 tabular-nums">${toDot(d.booking.endTime)}</span>
+                </div>
+              </div>`;
+          }
+        }
+
+        // ── Bagian aksi ──
+        let actionHTML = '';
+        if (status === 'empty') {
+          // Form mulai main
+          actionHTML = `
+            ${durPicker(`start-${id}`, 'Durasi Main')}
+            <button onclick="startPod('${id}')"
+              class="w-full py-2.5 rounded-xl text-xs font-bold bg-green-600 hover:bg-green-500 active:scale-95 transition-all text-white flex items-center justify-center gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/>
+              </svg>Mulai Main
+            </button>`;
+        } else if (status === 'active') {
+          if (showBF) {
+            // Form booking
+            actionHTML = `
+              ${durPicker(`booking-${id}`, 'Durasi Booking')}
+              <div class="flex gap-2">
+                <button onclick="bookPod('${id}')"
+                  class="flex-1 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 active:scale-95 transition-all text-white">
+                  Konfirmasi Booking
+                </button>
+                <button onclick="cancelBookingForm('${id}')"
+                  class="py-2 px-3 rounded-xl text-xs font-bold bg-gray-700 hover:bg-gray-600 active:scale-95 transition-all text-gray-300">
+                  Batal
+                </button>
+              </div>`;
+          } else {
+            // Tombol normal saat aktif
+            actionHTML = `
+              <div class="flex gap-2">
+                <button onclick="openBookingForm('${id}')"
+                  class="flex-1 py-2 rounded-xl text-xs font-bold bg-purple-600/80 hover:bg-purple-600 active:scale-95 transition-all text-white flex items-center justify-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 9v7.5"/>
+                  </svg>Booking
+                </button>
+                <button onclick="openModalSingle('${id}')"
+                  class="py-2 px-3 rounded-xl text-xs font-bold bg-red-600/20 hover:bg-red-600/40 active:scale-95 transition-all text-red-400 border border-red-600/20">
+                  Reset
+                </button>
+              </div>`;
+          }
+        } else {
+          // Booked — hanya reset
+          actionHTML = `
+            <button onclick="openModalSingle('${id}')"
+              class="w-full py-2 rounded-xl text-xs font-bold bg-red-600/20 hover:bg-red-600/40 active:scale-95 transition-all text-red-400 border border-red-600/20">
+              Reset Pod
+            </button>`;
+        }
+
+        // ── Kartu HTML ──
+        const card = document.createElement('div');
+        card.className = `pod-card ${bg} border ${bdr} rounded-2xl p-3.5`;
+        card.id = `pod-${id}`;
+        card.innerHTML = `
+          <div class="flex items-start justify-between mb-2.5">
+            <div>
+              <div class="text-xl font-black text-white leading-none">${id}</div>
+              <div class="text-xs text-gray-600 mt-0.5">Pod ${idx + 1}</div>
+            </div>
+            <div class="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold border ${bCls}">
+              <span class="w-1.5 h-1.5 rounded-full inline-block ${bDot}"></span>${bLabel}
+            </div>
+          </div>
+          ${timeHTML}
+          ${actionHTML}`;
+
+        grid.appendChild(card);
+      });
+
+      document.getElementById('active-count').textContent = activeCt;
+    }
+
+    // ───────────────────────────────────────────────
+    // UI BOOKING FORM TOGGLE
+    // ───────────────────────────────────────────────
+    function openBookingForm(id) { uiBooking[id] = true; render(); }
+    function cancelBookingForm(id) { uiBooking[id] = false; render(); }
+
+    // ───────────────────────────────────────────────
+    // FORMAT WHATSAPP
+    // ───────────────────────────────────────────────
+    function generateWA() {
+      const lines = ['*UPDATE SLOT HARI INI*', ''];
+      POD_IDS.forEach(id => {
+        const d = podData[id];
+        if (!d || !d.active) {
+          lines.push(`${id}  (kosong)`);
+        } else {
+          // Tampilkan jam selesai TERAKHIR (booking jika ada)
+          const lastEnd = d.booking ? d.booking.endTime : d.active.endTime;
+          lines.push(`${id}  ${toDot(lastEnd)}-00.00`);
+        }
+      });
+      document.getElementById('wa-output').value = lines.join('\n');
+    }
+
+    function copyToClipboard() {
+      const txt = document.getElementById('wa-output').value;
+      if (!txt || txt.includes('Tekan')) { toast('⚠️', 'Generate WA dulu!', 'warn'); return; }
+      navigator.clipboard.writeText(txt)
+        .then(() => toast('📋', 'Berhasil dicopy ke clipboard!'))
+        .catch(() => {
+          const ta = document.getElementById('wa-output');
+          ta.select(); document.execCommand('copy');
+          toast('📋', 'Berhasil dicopy!');
+        });
+    }
+
+    // ───────────────────────────────────────────────
+    // MODAL
+    // ───────────────────────────────────────────────
+    function confirmResetAll() { showModal('modal-all'); }
+    function closeModalAll()   { hideModal('modal-all'); }
+
+    function openModalSingle(id) {
+      document.getElementById('modal-pod-id').textContent = id;
+      document.getElementById('modal-single-confirm').onclick = () => resetPod(id);
+      showModal('modal-single');
+    }
+    function closeModalSingle() { hideModal('modal-single'); }
+
+    function showModal(id) {
+      const m = document.getElementById(id);
+      m.classList.remove('hidden'); m.classList.add('flex');
+    }
+    function hideModal(id) {
+      const m = document.getElementById(id);
+      m.classList.add('hidden'); m.classList.remove('flex');
+    }
+
+    // Tutup modal saat klik backdrop
+    ['modal-all','modal-single'].forEach(id => {
+      document.getElementById(id).addEventListener('click', function(e) {
+        if (e.target === this) hideModal(id);
+      });
+    });
+
+    // ───────────────────────────────────────────────
+    // TOAST
+    // ───────────────────────────────────────────────
+    let _toastTimer = null;
+    function toast(icon, text) {
+      document.getElementById('toast-icon').textContent = icon;
+      document.getElementById('toast-text').textContent = text;
+      document.getElementById('toast').classList.remove('hidden-toast');
+      clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(() => document.getElementById('toast').classList.add('hidden-toast'), 3000);
+    }
+
+    // ───────────────────────────────────────────────
+    // JAM DIGITAL
+    // ───────────────────────────────────────────────
+    function updateClock() {
+      const n = new Date();
+      document.getElementById('clock').textContent =
+        `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+      const days   = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+      const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+      document.getElementById('date-label').textContent =
+        `${days[n.getDay()]}, ${n.getDate()} ${months[n.getMonth()]} ${n.getFullYear()}`;
+    }
+
+    // ───────────────────────────────────────────────
+    // INIT
+    // ───────────────────────────────────────────────
+    load();
+    render();
+    generateWA();
+    updateClock();
+    setInterval(updateClock, 1000);
+    // Re-render tiap menit agar sisa waktu selalu fresh
+    setInterval(() => { render(); }, 60000);
+  </script>
+</body>
+</html>
